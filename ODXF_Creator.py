@@ -4,16 +4,36 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 import os, glob
 import xml.etree.ElementTree as ET
 import datetime
+import json
 from functools import partial
 
 
 
 class Ui_Dialog(object):
 
+    def InitalLoad(self):
+        with open(r'config.json') as json_file:
+            data = json.load(json_file)
+            fileLocation = data["odxfPath"]
+        if fileLocation != "":
+            self.fileLocationLineEdit.setText(fileLocation)
+            global path
+            path = fileLocation + "\\"
+            self.initaliseVehicleComboBox()
+
     def fileLocationButtonPushed(self):
         #Used for setting the location of the IVS Files
-        fileLoc = str(QtWidgets.QFileDialog.getExistingDirectory(None, "Select Directory"))
+        with open(r'config.json') as json_file:
+            data = json.load(json_file)
+            fileLocation = data["odxfPath"]
+            
+        fileLoc = str(QtWidgets.QFileDialog.getExistingDirectory(None, "Select Directory", fileLocation))
         #Stores it in the filelocationLineEdit
+        data["odxfPath"] = fileLoc
+        
+        with open(r'config.json', 'w') as outfile:
+            json.dump(data, outfile)
+
         self.fileLocationLineEdit.setText(fileLoc)
         global path
         path = fileLoc + "\\"
@@ -46,6 +66,9 @@ class Ui_Dialog(object):
                 #Add to the modules list
                 modules.append(y.split("-")[1])
         #Remopve dupliactes
+        modules.insert(1,"19L310")
+        modules.insert(2,"19L320")
+        
         modules = list(dict.fromkeys(modules))
         #Clear the combo box and append the modules
         self.moduleComboBox.clear()
@@ -92,6 +115,10 @@ class Ui_Dialog(object):
         self.valueComboBox.clear()
         self.valueComboBox.addItems(value)
 
+    def valueComboBoxSelected(self):
+        self.fileLineEdit.setText(self.hardwareComboBox.currentText() + "-" + self.moduleComboBox.currentText() + "-")
+
+
     def saveXML(self, XML, path):
         #Used for saving the xml to a specific file path
         XML.write(path, encoding='utf-8', xml_declaration=True)
@@ -117,7 +144,7 @@ class Ui_Dialog(object):
         prevFilePath = glob.glob(newPath + hardware +"*" + module + "*" + prevValue + ".xml")[0]
         prevFile = prevFilePath.split("\\")
         prevFile = prevFile[len(prevFile) - 1].split(".xml")[0]
-        newFilePath = newPath + hardware + "-" + module + "-" + newValue + ".xml"
+        newFilePath = newPath + newValue + ".xml"
         newFile = newFilePath.split("\\")
         newFile = newFile[len(newFile) - 1].split(".xml")[0]
 
@@ -169,7 +196,7 @@ class Ui_Dialog(object):
         module = self.moduleComboBox.currentText()
         hardware = self.hardwareComboBox.currentText()
         newValue = self.fileLineEdit.text()
-        newFilePath = path + vehicle + "\\" + hardware + "-" + module + "-" + newValue + ".xml"
+        newFilePath = path + vehicle + "\\" + newValue + ".xml"
 
         newFileXML = ET.parse(newFilePath)
         newFileRoot = newFileXML.getroot()
@@ -212,7 +239,7 @@ class Ui_Dialog(object):
         module = self.moduleComboBox.currentText()
         hardware = self.hardwareComboBox.currentText()
         newValue = self.fileLineEdit.text()
-        newFilePath = path + vehicle + "\\" + hardware + "-" + module + "-" + newValue + ".xml"
+        newFilePath = path + vehicle + "\\" + newValue + ".xml"
 
         newFileXML = ET.parse(newFilePath)
         newFileRoot = newFileXML.getroot()
@@ -226,14 +253,16 @@ class Ui_Dialog(object):
                     #Checks if it is the correct area
                     if x.attrib["ID"] == idName:
                         #If it is update the placeholder text
-                        self.partNumberLineEdit.setPlaceholderText("Prev: " + x[1].text)
+                        temp = x[1].text.split("-")
+                        self.partNumberLineEdit.setText(temp[0] + "-" + temp[1] + "-")
         else:
             #Get the id from the combobox
             idName = self.typeComboBox.currentText().split(" - ")[0]
             idName = idName.split("_")
             prev = idName[2] + "-" + idName[3] + "-" + idName[4]
             #Set the placeholder to previous value
-            self.partNumberLineEdit.setPlaceholderText("Prev: " + prev)
+            temp = prev.split("-")
+            self.partNumberLineEdit.setText(temp[0] + "-" + temp[1] + "-")
 
     def updateFileButtonPushed(self):
         # Getting the text from the comboboxes selected
@@ -241,7 +270,7 @@ class Ui_Dialog(object):
         module = self.moduleComboBox.currentText()
         hardware = self.hardwareComboBox.currentText()
         newValue = self.fileLineEdit.text()
-        newFilePath = path + vehicle + "\\" + hardware + "-" + module + "-" + newValue + ".xml"
+        newFilePath = path + vehicle + "\\" + newValue + ".xml"
 
         newFileXML = ET.parse(newFilePath)
         newFileRoot = newFileXML.getroot()
@@ -369,6 +398,7 @@ class Ui_Dialog(object):
 
     def setupUi(self, Dialog):
         #Code to create the UI Design
+
         Dialog.setObjectName("Dialog")
         Dialog.resize(774, 510)
         Dialog.closeEvent = partial(self.closeEvent, Dialog)
@@ -502,9 +532,11 @@ class Ui_Dialog(object):
         self.vehicleComboBox.activated.connect(self.vehicleComboBoxSelected)
         self.moduleComboBox.activated.connect(self.moduleComboBoxSelected)
         self.hardwareComboBox.activated.connect(self.hardwareComboBoxSelected)
+        self.valueComboBox.activated.connect(self.valueComboBoxSelected)
         self.typeComboBox.activated.connect(self.typeComboBoxSelected)
 
         self.retranslateUi(Dialog)
+        self.InitalLoad()
         QtCore.QMetaObject.connectSlotsByName(Dialog)
 
     def retranslateUi(self, Dialog):

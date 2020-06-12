@@ -5,11 +5,22 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 import os, glob
 import xml.etree.ElementTree as ET
 import datetime
+import json
 from functools import partial
 
 path = ""
 comments = []
 class Ui_Dialog(object):
+
+    def InitalLoad(self):
+        with open(r'config.json') as json_file:
+            data = json.load(json_file)
+            fileLocation = data["ivsPath"]
+        if fileLocation != "":
+            self.fileLocationLineEdit.setText(fileLocation)
+            global path
+            path = fileLocation + "\\"
+            self.initaliseComboBox()
 
     def initaliseComboBox(self):
         #List all the vehicle lines that are available
@@ -37,7 +48,9 @@ class Ui_Dialog(object):
                 modules.append(y.split("-")[1])
         # Create a plaehoolder at beginign of list
         modules.insert(0,"-- Select Module --")
-        #Remopve dupliactes
+        modules.insert(1,"19L310")
+        modules.insert(2,"19L320")
+        #Remove dupliactes
         modules = list(dict.fromkeys(modules))
         #Clear the combo box and append the modules
         self.moduleComboBox.clear()
@@ -88,6 +101,8 @@ class Ui_Dialog(object):
         self.valueComboBox.clear()
         self.valueComboBox.addItems(value)
 
+    def valueComboBoxSelected(self):
+        self.fileLineEdit.setText(self.hardwareComboBox.currentText() + "-" + self.moduleComboBox.currentText() + "-")
     
     def createFileButtonClicked(self):
         #Used for creating the files from the combobox choices
@@ -103,7 +118,7 @@ class Ui_Dialog(object):
         prevFilePath = glob.glob(newPath + hardware +"*" + module + "*" + prevValue + ".xml")[0]
         prevFile = prevFilePath.split("\\")
         prevFile = prevFile[len(prevFile) - 1].split(".xml")[0]
-        newFilePath = newPath + hardware + "-" + module + "-" + newValue + ".xml"
+        newFilePath = newPath + newValue + ".xml"
         newFile = newFilePath.split("\\")
         newFile = newFile[len(newFile) - 1].split(".xml")[0]
 
@@ -160,7 +175,7 @@ class Ui_Dialog(object):
         newPath = path + vehicle + "\\"
         
         # Gets the xml from the file and parses through it
-        newFilePath = newPath + hardware + "-" + module + "-" + newValue + ".xml"
+        newFilePath = newPath + newValue + ".xml"
         tree = ET.parse(newFilePath)
         root = tree.getroot()
 
@@ -214,9 +229,9 @@ class Ui_Dialog(object):
         newPath = path + vehicle + "\\"
         
         #Find the Path for the newfile which has been created
-        newFilePath = newPath + hardware + "-" + module + "-" + newValue + ".xml"
+        newFilePath = newPath + newValue + ".xml"
         #Find the name of the new file 
-        newFile = hardware + "-" + module + "-" + newValue + ".xml"
+        newFile = newValue + ".xml"
 
         # Parse the xml file into the python viewer and get the first root
         newFileXML = ET.parse(newFilePath)
@@ -247,10 +262,12 @@ class Ui_Dialog(object):
 
         if 'hardware' in tempRoot.tag:
             # Hardware has different tags to everythign else
-            self.updateFileLineEdit.setPlaceholderText("Prev: " + tempRoot.attrib['hardwareType'])
+            temp = tempRoot.attrib['hardwareType'].split("-")
+            self.updateFileLineEdit.setText(temp[0] + "-" + temp[1] + "-")
         else:
             # Normal tags
-            self.updateFileLineEdit.setPlaceholderText("Prev: " + tempRoot.attrib['filePN'])
+            temp = tempRoot.attrib['filePN'].split("-")
+            self.updateFileLineEdit.setText(temp[0] + "-" + temp[1] + "-")
             
 
         
@@ -266,9 +283,9 @@ class Ui_Dialog(object):
         newPath = path + vehicle + "\\"
         
         #Find the Path for the newfile which has been created
-        newFilePath = newPath + hardware + "-" + module + "-" + newValue + ".xml"
+        newFilePath = newPath + newValue + ".xml"
         #Find the name of the new file 
-        newFile = hardware + "-" + module + "-" + newValue + ".xml"
+        newFile = newValue + ".xml"
 
         # Parse the xml file into the python viewer and get the first root
         newFileXML = ET.parse(newFilePath)
@@ -372,13 +389,22 @@ class Ui_Dialog(object):
 
     def fileLocationPressed(self):
         #Used for setting the location of the IVS Files
-        fileLoc = str(QtWidgets.QFileDialog.getExistingDirectory(None, "Select Directory"))
+        with open(r'config.json') as json_file:
+            data = json.load(json_file)
+            fileLocation = data["ivsPath"]
+            
+        fileLoc = str(QtWidgets.QFileDialog.getExistingDirectory(None, "Select Directory", fileLocation))
         #Stores it in the filelocationLineEdit
+        data["ivsPath"] = fileLoc
+        
+        with open(r'config.json', 'w') as outfile:
+            json.dump(data, outfile)
+
         self.fileLocationLineEdit.setText(fileLoc)
         global path
         path = fileLoc + "\\"
         
-        #Initalise the comboboxes once its been selected
+        #Initalise the combobox for vehicles
         self.initaliseComboBox()
 
     def closeEvent(self, Previous, event):
@@ -493,6 +519,7 @@ class Ui_Dialog(object):
         self.vehicleComboBox.activated.connect(self.vehicleComboBoxSelected)
         self.hardwareComboBox.activated.connect(self.hardwareComboBoxSelected)
         self.moduleComboBox.activated.connect(self.moduleComboBoxSelected)
+        self.valueComboBox.activated.connect(self.valueComboBoxSelected)
         self.updateAreaComboBox.activated.connect(self.updateAreaComboBoxSelected)
 
         #Activating the Buttons on the UI When they are pressed
@@ -502,6 +529,7 @@ class Ui_Dialog(object):
 
         self.retranslateUi(Dialog)
         QtCore.QMetaObject.connectSlotsByName(Dialog)
+        self.InitalLoad()
         
 
     def retranslateUi(self, Dialog):
